@@ -1,15 +1,7 @@
-MassThrust: 40000
-MaxAngle: 0.4
 PIDs:
-  Body:
-    kp: 30000.0
-    kd: 15000.0
-    ki:  2000.0
-  Yaw:
-    kp: -100.0
-    kd: -25.0
-    ki: 0.0
-    minOutput: -200.0
-    maxOutput: 200.0
-    integratorMin: 0.0
-    integratorMax: 0.0
+  kp: 1.0
+  kd: 1.0
+  kR: 1.0
+  kw: 1.0
+mass: 0.27
+L: 0.06

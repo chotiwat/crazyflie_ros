@@ -1,10 +1,13 @@
 #include <ros/ros.h>
 #include <tf/transform_listener.h>
+#include <tf_conversions/tf_eigen.h>
 #include <std_srvs/Empty.h>
 #include <geometry_msgs/Twist.h>
+#include <sensor_msgs/Imu.h>
 
+#include <Eigen/Dense>
 
-#include "pid.hpp"
+#include "crazyflie_driver/MotorCommand.h"
 
 double get(
     const ros::NodeHandle& n,
@@ -26,33 +29,29 @@ public:
         , m_frame(frame)
         , m_pubNav()
         , m_listener()
-        , m_pidYaw(
-            get(n, "PIDs/Yaw/kp"),
-            get(n, "PIDs/Yaw/kd"),
-            get(n, "PIDs/Yaw/ki"),
-            get(n, "PIDs/Yaw/minOutput"),
-            get(n, "PIDs/Yaw/maxOutput"),
-            get(n, "PIDs/Yaw/integratorMin"),
-            get(n, "PIDs/Yaw/integratorMax"),
-            "yaw",
-            true)
         , m_state(Idle)
         , m_goal()
+        , m_imu()
         , m_subscribeGoal()
+        , m_subscribeImu()
         , m_serviceTakeoff()
         , m_serviceLand()
         , m_thrust(0)
-        , m_kp(get(n, "PIDs/Body/kp"))
-        , m_kd(get(n, "PIDs/Body/kd"))
-        , m_ki(get(n, "PIDs/Body/ki"))
+        , m_kp(get(n, "PIDs/kp"))
+        , m_kd(get(n, "PIDs/kd"))
+        , m_kR(get(n, "PIDs/kR"))
+        , m_kw(get(n, "PIDs/kw"))
+        , m_mass(get(n, "mass"))
+        , m_L(get(n, "L"))
         , m_oldPosition(0,0,0)
-        , m_current_r_error_integration(0,0,0)
-        , m_massThrust(get(n, "MassThrust"))
-        , m_maxAngle(get(n, "MaxAngle"))
+        // , m_current_r_error_integration(0,0,0),
+        // , m_massThrust(get(n, "MassThrust"))
+        // , m_maxAngle(get(n, "MaxAngle"))
     {
         ros::NodeHandle nh;
-        m_pubNav = nh.advertise<geometry_msgs::Twist>("cmd_vel", 1);
+        m_pubNav = nh.advertise<crazyflie_driver::MotorCommand>("motorCommand", 1);
         m_subscribeGoal = nh.subscribe("goal", 1, &Controller::goalChanged, this);
+        m_subscribeImu = nh.subscribe("imu", 1, &Controller::imuChanged, this);
         m_serviceTakeoff = nh.advertiseService("takeoff", &Controller::takeoff, this);
         m_serviceLand = nh.advertiseService("land", &Controller::land, this);
     }
@@ -71,12 +70,18 @@ private:
         m_goal = *msg;
     }
 
+    void imuChanged(
+        const sensor_msgs::Imu::ConstPtr& msg)
+    {
+        m_imu = *msg;
+    }
+
     bool takeoff(
         std_srvs::Empty::Request& req,
         std_srvs::Empty::Response& res)
     {
         ROS_INFO("Takeoff requested!");
-        m_state = TakingOff;
+        m_state = Automatic;
 
         return true;
     }
@@ -99,12 +104,6 @@ private:
         m_listener.lookupTransform(sourceFrame, targetFrame, ros::Time(0), result);
     }
 
-    void pidReset()
-    {
-        m_current_r_error_integration = tf::Vector3(0,0,0);
-        m_pidYaw.reset();
-    }
-
     void iteration(const ros::TimerEvent& e)
     {
         float dt = e.current_real.toSec() - e.last_real.toSec();
@@ -117,7 +116,6 @@ private:
                 m_listener.lookupTransform(m_worldFrame, m_frame, ros::Time(0), transform);
                 if (transform.getOrigin().z() > 0.05 || m_thrust > 50000)
                 {
-                    pidReset();
                     m_state = Automatic;
                     m_thrust = 0;
                 }
@@ -145,93 +143,107 @@ private:
             // intentional fall-thru
         case Automatic:
             {
-                tf::StampedTransform transform;
-                m_listener.lookupTransform(m_worldFrame, m_frame, ros::Time(0), transform);
+                tf::StampedTransform tf_transform;
+                m_listener.lookupTransform(m_worldFrame, m_frame, ros::Time(0), tf_transform);
 
-                tf::Vector3 position = transform.getOrigin();
-                tf::Vector3 current_velocity = (position - m_oldPosition) / dt;
-                m_oldPosition = position;
+                // CURRENT STATES
+                Eigen::Affine3d transform;
+                tf::transformTFToEigen(tf_transform, transform);
 
-                tf::Vector3 current_z_axis = transform.getRotation().getAxis();
-                current_z_axis /= transform.getRotation().length();
+                // Current position
+                Eigen::Vector3d current_position = transform.translation();
+                // Current velocity
+                Eigen::Vector3d current_velocity = (current_position - m_oldPosition) / dt;
+                m_oldPosition = current_position;
+                // Current Orientation
+                // TODO: might want to get this from IMU
+                Eigen::Matrix3d current_orientation = transform.rotation();
 
-                tf::Vector3 target_position(
-                    m_goal.pose.position.x,
-                    m_goal.pose.position.y,
-                    m_goal.pose.position.z);
+                //Current angular velocity
+                Eigen::Vector3d current_angular_velocity(
+                    m_imu.angular_velocity.x,
+                    m_imu.angular_velocity.y,
+                    m_imu.angular_velocity.z
+                );
 
-                tf::Quaternion target_quaternion(
-                    m_goal.pose.orientation.x,
-                    m_goal.pose.orientation.y,
-                    m_goal.pose.orientation.z,
-                    m_goal.pose.orientation.w);
+                //DESIRED STATES
+                // TODO; get this from a message
 
-                tfScalar target_euler_roll, target_euler_pitch, target_euler_yaw;
-                tf::Matrix3x3(target_quaternion).getRPY(
-                    target_euler_roll,
-                    target_euler_pitch,
-                    target_euler_yaw);
+                // Desired position
+                Eigen::Vector3d target_position(0,0,0.5);
+                //Desired velocity
+                Eigen::Vector3d target_velocity(0,0,0);
+                //Desired acceleration
+                Eigen::Vector3d target_acceleration(0,0,0);
+                //Desired yaw
+                double target_yaw = 0;
 
-                tfScalar current_euler_roll, current_euler_pitch, current_euler_yaw;
-                tf::Matrix3x3(transform.getRotation()).getRPY(
-                    current_euler_roll,
-                    current_euler_pitch,
-                    current_euler_yaw);
+                // set this to 0 because we don't want to rotate during the flight
+                Eigen::Vector3d target_angular_velocity(0, 0, 0);
 
-                tf::Vector3 current_r_error = target_position - position;
-                tf::Vector3 current_r_error_unit = current_r_error.normalized();
+                //CALCULATE THRUST
 
-                m_current_r_error_integration += current_r_error * dt;
-                if (m_current_r_error_integration.length() >= 6) {
-                    m_current_r_error_integration = 6.0 * m_current_r_error_integration.normalized();
-                }
+                // Position Error
+                Eigen::Vector3d current_r_error = target_position - current_position;
+                // Velocity Error
+                Eigen::Vector3d current_v_error = target_velocity - current_velocity;
+                // Desired thrust
+                Eigen::Vector3d target_thrust = - m_kp*current_r_error - m_kd*current_v_error + m_mass * target_acceleration + m_mass * Eigen::Vector3d(0,0,9.81);
+                // Current z_axis
+                Eigen::Vector3d current_z_axis = Eigen::Quaterniond(current_orientation).vec();
+                current_z_axis /= current_z_axis.norm();
+                // Current thrust
+                double current_thrust = target_thrust.dot(current_z_axis);
 
-                double r_error_norm = current_r_error.length();
-                tf::Vector3 target_velocity = 1.3 * (r_error_norm/5.0)*current_r_error_unit;
-                if (r_error_norm >= 5.0) {
-                    target_velocity = 1.3 * current_r_error_unit; // The velocity in the target position direction is 1 m/s
-                }
+                //CALCULATE MOMENT
 
-                // compute z-axis-desired
-                tf::Vector3 z_axis_desired = m_massThrust * tf::Vector3(0,0,1) + m_kp*current_r_error + m_kd*(target_velocity - current_velocity) + m_ki*m_current_r_error_integration;
-                double angle = acos(z_axis_desired.normalized().dot(tf::Vector3(0,0,1)));
-                double kp = m_kp;
-                double kd = m_kd;
-                double ki = m_ki;
+                // Angular_velocity Error
+                Eigen::Vector3d current_w_error = target_angular_velocity - current_angular_velocity;
+                // Desired z_axis
+                Eigen::Vector3d z_axis_desired = target_thrust/target_thrust.norm();
+                // Desired x_center_axis
+                Eigen::Vector3d x_center_axis_desired = Eigen::Vector3d(sin(target_yaw), cos(target_yaw), 0);
+                // Desired y_axis
+                Eigen::Vector3d y_axis_desired = z_axis_desired.cross(x_center_axis_desired);
+                // Desired x_axis
+                Eigen::Vector3d x_axis_desired = y_axis_desired.cross(z_axis_desired);
+                // Desired orientation
+                Eigen::Matrix3d orientation_desired;
+                orientation_desired << x_axis_desired, y_axis_desired, z_axis_desired;
+                // Orientation Error in Matrix form
+                Eigen::Matrix3d current_R_error = orientation_desired.transpose() * current_orientation - current_orientation.transpose() * orientation_desired;
+                // Orientation Error after Vee Map
+                Eigen::Vector3d e_R = 0.5 * Eigen::Vector3d(current_R_error(2,1), current_R_error(0,2),current_R_error(1,0));
+                // Calculate Moment
+                Eigen::Vector3d current_moment = - m_kR * e_R - m_kw * current_w_error;
 
-                while (angle >= m_maxAngle) {
-                    kp *= 0.9;
-                    kd *= 0.9;
-                    ki *= 0.9;
-                    z_axis_desired = m_massThrust * tf::Vector3(0,0,1) + kp*current_r_error + kd*(target_velocity - current_velocity) + ki*m_current_r_error_integration;
-                    angle = acos(z_axis_desired.normalized().dot(tf::Vector3(0,0,1)));
-                }
-                tf::Vector3 z_axis_desired_unit = z_axis_desired.normalized();
+                //COMPUTE rotor speeds from current_thrust and current_moment
 
-                // control
-                double thrust = z_axis_desired.dot(current_z_axis);
-                if (thrust < 0) {
-                    thrust = 0;
-                }
-                if (thrust > 65536) {
-                    thrust = 65536;
-                }
+                // % [ 1/(4*kF),           0, -1/(2*L*kF),  1/(4*kM)]
+                // % [ 1/(4*kF),  1/(2*L*kF),           0, -1/(4*kM)]
+                // % [ 1/(4*kF),           0,  1/(2*L*kF),  1/(4*kM)]
+                // % [ 1/(4*kF), -1/(2*L*kF),           0, -1/(4*kM)]
 
-                tf::Vector3 x_axis_desired = z_axis_desired_unit.cross(tf::Vector3(sin(target_euler_yaw), cos(target_euler_yaw), 0));
-                x_axis_desired.normalize();
-                tf::Vector3 y_axis_desired = z_axis_desired_unit.cross(x_axis_desired);
+                double kF = 1;
+                double kM = 1;
 
-                double pitch_angle = asin(-1.0*x_axis_desired.getZ()) * 180.0 / M_PI;
-                double yaw_angle = atan2(x_axis_desired.getY(), x_axis_desired.getX());
-                double roll_angle = atan2(y_axis_desired.getZ(), z_axis_desired_unit.getZ()) * 180.0 / M_PI;
+                Eigen::Matrix4d outputMatrix;
+                outputMatrix << 1/(4*kF),           0, -1/(2*m_L*kF),  1/(4*kM),
+                                1/(4*kF),  1/(2*m_L*kF),           0, -1/(4*kM),
+                                1/(4*kF),           0,  1/(2*m_L*kF),  1/(4*kM),
+                                1/(4*kF), -1/(2*m_L*kF),           0, -1/(4*kM);
 
-                geometry_msgs::Twist msg;
-                msg.linear.x = pitch_angle;
-                msg.linear.y = roll_angle;
-                msg.linear.z = thrust;
-                msg.angular.z = m_pidYaw.update(current_euler_yaw, yaw_angle);
-                m_pubNav.publish(msg);
+                Eigen::Vector4d u(current_thrust, current_moment[0], current_moment[1], current_moment[2]);
+                Eigen::Vector4d rotorSpeeds = outputMatrix * u;
 
+                crazyflie_driver::MotorCommand msg;
+                msg.motorRatioM1 = rotorSpeeds[0];
+                msg.motorRatioM2 = rotorSpeeds[1];
+                msg.motorRatioM3 = rotorSpeeds[2];
+                msg.motorRatioM4 = rotorSpeeds[3];
+
+                ROS_INFO("%d", msg.motorRatioM1);
+                // m_pubNav.publish(msg);
             }
             break;
         case Idle:
@@ -258,10 +270,11 @@ private:
     std::string m_frame;
     ros::Publisher m_pubNav;
     tf::TransformListener m_listener;
-    PID m_pidYaw;
     State m_state;
     geometry_msgs::PoseStamped m_goal;
+    sensor_msgs::Imu m_imu;
     ros::Subscriber m_subscribeGoal;
+    ros::Subscriber m_subscribeImu;
     ros::ServiceServer m_serviceTakeoff;
     ros::ServiceServer m_serviceLand;
     float m_thrust;
@@ -269,10 +282,13 @@ private:
     double m_kp;
     double m_kd;
     double m_ki;
-    tf::Vector3 m_oldPosition;
-    tf::Vector3 m_current_r_error_integration;
-    double m_massThrust;
-    double m_maxAngle;
+    double m_kR;
+    double m_kw;
+    Eigen::Vector3d m_oldPosition;
+    double m_mass;
+    double m_L;
+    // double m_massThrust;
+    // double m_maxAngle;
 };
 
 int main(int argc, char **argv)
@@ -286,7 +302,7 @@ int main(int argc, char **argv)
   std::string frame;
   n.getParam("frame", frame);
   double frequency;
-  n.param("frequency", frequency, 50.0);
+  n.param("frequency", frequency, 100.0);
 
   Controller controller(worldFrame, frame, n);
   controller.run(frequency);

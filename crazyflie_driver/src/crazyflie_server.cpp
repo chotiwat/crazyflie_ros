@@ -3,6 +3,7 @@
 #include "crazyflie_driver/LogBlock.h"
 #include "crazyflie_driver/GenericLogData.h"
 #include "crazyflie_driver/UpdateParams.h"
+#include "crazyflie_driver/MotorCommand.h"
 #include "std_srvs/Empty.h"
 #include "geometry_msgs/Twist.h"
 #include "sensor_msgs/Imu.h"
@@ -47,7 +48,8 @@ public:
     , m_logBlocks(log_blocks)
     , m_serviceEmergency()
     , m_serviceUpdateParams()
-    , m_subscribeCmdVel()
+    // , m_subscribeCmdVel()
+    , m_subscribeMotorCmd()
     , m_pubImu()
     , m_pubTemp()
     , m_pubMag()
@@ -57,7 +59,8 @@ public:
     , m_sentSetpoint(false)
   {
     ros::NodeHandle n;
-    m_subscribeCmdVel = n.subscribe(tf_prefix + "/cmd_vel", 1, &CrazyflieROS::cmdVelChanged, this);
+    // m_subscribeCmdVel = n.subscribe(tf_prefix + "/cmd_vel", 1, &CrazyflieROS::cmdVelChanged, this);
+    m_subscribeMotorCmd = n.subscribe(tf_prefix + "/motorCommand", 1, &CrazyflieROS::motorCommandChanged, this);
     m_serviceEmergency = n.advertiseService(tf_prefix + "/emergency", &CrazyflieROS::emergency, this);
     m_serviceUpdateParams = n.advertiseService(tf_prefix + "/update_params", &CrazyflieROS::updateParams, this);
 
@@ -159,16 +162,26 @@ private:
     return true;
   }
 
-  void cmdVelChanged(
-    const geometry_msgs::Twist::ConstPtr& msg)
+  // void cmdVelChanged(
+  //   const geometry_msgs::Twist::ConstPtr& msg)
+  // {
+  //   if (!m_isEmergency) {
+  //     float roll = msg->linear.y + m_roll_trim;
+  //     float pitch = - (msg->linear.x + m_pitch_trim);
+  //     float yawrate = msg->angular.z;
+  //     uint16_t thrust = std::min<uint16_t>(std::max<float>(msg->linear.z, 0.0), 60000);
+
+  //     m_cf.sendSetpoint(roll, pitch, yawrate, thrust);
+  //     m_sentSetpoint = true;
+  //   }
+  // }
+
+  void motorCommandChanged(
+    const crazyflie_driver::MotorCommand::ConstPtr& msg)
   {
     if (!m_isEmergency) {
-      float roll = msg->linear.y + m_roll_trim;
-      float pitch = - (msg->linear.x + m_pitch_trim);
-      float yawrate = msg->angular.z;
-      uint16_t thrust = std::min<uint16_t>(std::max<float>(msg->linear.z, 0.0), 60000);
-
-      m_cf.sendSetpoint(roll, pitch, yawrate, thrust);
+      ROS_INFO("set: %d\n", msg->motorRatioM4);
+      m_cf.sendSetpoint(msg->motorRatioM1, msg->motorRatioM2, msg->motorRatioM3, msg->motorRatioM4);
       m_sentSetpoint = true;
     }
   }
@@ -395,7 +408,8 @@ private:
 
   ros::ServiceServer m_serviceEmergency;
   ros::ServiceServer m_serviceUpdateParams;
-  ros::Subscriber m_subscribeCmdVel;
+  // ros::Subscriber m_subscribeCmdVel;
+  ros::Subscriber m_subscribeMotorCmd;
   ros::Publisher m_pubImu;
   ros::Publisher m_pubTemp;
   ros::Publisher m_pubMag;

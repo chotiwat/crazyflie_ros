@@ -96,12 +96,12 @@ void Crazyflie::logReset()
 }
 
 void Crazyflie::sendSetpoint(
-  float roll,
-  float pitch,
-  float yawrate,
-  uint16_t thrust)
+  uint16_t motorRatioM1,
+  uint16_t motorRatioM2,
+  uint16_t motorRatioM3,
+  uint16_t motorRatioM4)
 {
-  crtpSetpointRequest request(roll, pitch, yawrate, thrust);
+  crtpSetpointRequest request(motorRatioM1, motorRatioM2, motorRatioM3, motorRatioM4);
   sendPacket((const uint8_t*)&request, sizeof(request));
 }
 

@@ -5,10 +5,11 @@ find_package(catkin REQUIRED COMPONENTS
   message_generation
   std_msgs
   tf
+  tf_conversions
 )
 
 ## System dependencies are found with CMake's conventions
-# find_package(Boost REQUIRED COMPONENTS system)
+find_package(Eigen3 REQUIRED)
 
 
 ## Uncomment this if the package has a setup.py. This macro ensures
@@ -89,7 +90,7 @@ catkin_package(
 
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
-# include_directories(include)
+include_directories(${EIGEN3_INCLUDE_DIR})
 
 ## Declare a cpp library
 # add_library(crazyflie_controller

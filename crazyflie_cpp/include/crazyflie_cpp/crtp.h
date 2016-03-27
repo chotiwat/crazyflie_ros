@@ -153,22 +153,23 @@ struct crtpParamValueResponse
 struct crtpSetpointRequest
 {
   crtpSetpointRequest(
-    float roll,
-    float pitch,
-    float yawrate,
-    uint16_t thrust)
+    uint16_t motorRatioM1,
+    uint16_t motorRatioM2,
+    uint16_t motorRatioM3,
+    uint16_t motorRatioM4)
     : header(0x03, 0)
-    , roll(roll)
-    , pitch(pitch)
-    , yawrate(yawrate)
-    , thrust(thrust)
+    , motorRatioM1(motorRatioM1)
+    , motorRatioM2(motorRatioM2)
+    , motorRatioM3(motorRatioM3)
+    , motorRatioM4(motorRatioM4)
+
   {
   }
   const crtp header;
-  float roll;
-  float pitch;
-  float yawrate;
-  uint16_t thrust;
+  uint16_t motorRatioM1;
+  uint16_t motorRatioM2;
+  uint16_t motorRatioM3;
+  uint16_t motorRatioM4;
 }  __attribute__((packed));
 
 // Port 4 (Memory access)

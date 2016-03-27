@@ -1,0 +1,4 @@
+uint16 motorRatioM1
+uint16 motorRatioM2
+uint16 motorRatioM3
+uint16 motorRatioM4
