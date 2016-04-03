@@ -59,7 +59,6 @@ public:
     ros::NodeHandle n;
     m_subscribeCmdVel = n.subscribe(tf_prefix + "/cmd_vel", 1, &CrazyflieROS::cmdVelChanged, this);
     m_serviceEmergency = n.advertiseService(tf_prefix + "/emergency", &CrazyflieROS::emergency, this);
-    m_serviceUpdateParams = n.advertiseService(tf_prefix + "/update_params", &CrazyflieROS::updateParams, this);
 
     m_pubImu = n.advertise<sensor_msgs::Imu>(tf_prefix + "/imu", 10);
     m_pubTemp = n.advertise<sensor_msgs::Temperature>(tf_prefix + "/temperature", 10);
@@ -112,6 +111,7 @@ private:
       U value;
       ros::param::get(ros_param, value);
       m_cf.setParam<T>(id, (T)value);
+      ROS_INFO_STREAM("updateParam " << ros_param << " " << value);
   }
 
   bool updateParams(
@@ -215,6 +215,8 @@ private:
             break;
         }
       }
+      ros::NodeHandle n;
+      m_serviceUpdateParams = n.advertiseService(m_tf_prefix + "/update_params", &CrazyflieROS::updateParams, this);
     }
 
     std::unique_ptr<LogBlock<logImu> > logBlockImu;

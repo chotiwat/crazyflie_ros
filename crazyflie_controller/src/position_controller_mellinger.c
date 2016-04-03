@@ -152,9 +152,9 @@ void positionControllerMellingerUpdate(
   cross(&z_axis_desired, &x_axis_desired, &y_axis_desired);
 
   // Output
-  *eulerRollDesired = atan2(y_axis_desired.z, z_axis_desired.z) * 180.0 / M_PI;
+  *eulerRollDesired = -atan2(y_axis_desired.z, z_axis_desired.z) * 180.0 / M_PI;
   *eulerPitchDesired = asin(x_axis_desired.z) * 180.0 / M_PI;
-  *eulerYawDesired = target->yaw; // assuming we have direct control!
+  *eulerYawDesired = target->yaw * 180.0 / M_PI; // assuming we have direct control!
   *thrustDesired = current_thrust;
 
   // update state

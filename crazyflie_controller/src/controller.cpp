@@ -10,6 +10,7 @@
 #include <actionlib/server/simple_action_server.h>
 
 #include <crazyflie_driver/GenericLogData.h>
+#include <crazyflie_driver/UpdateParams.h>
 
 
 #include "pid.hpp"
@@ -87,6 +88,19 @@ public:
     void run(double frequency)
     {
         ros::NodeHandle node;
+        // ros::NodeHandle nodeLocal("~");
+
+        ROS_INFO("wait_for_service update_params");
+        ros::ServiceClient updateParamsService = node.serviceClient<crazyflie_driver::UpdateParams>("/crazyflie/update_params");
+        updateParamsService.waitForExistence();
+        ROS_INFO("found update_params");
+
+        node.setParam("/crazyflie/flightmode/stabModeYaw", 1);
+
+        crazyflie_driver::UpdateParams updateParams;
+        updateParams.request.params.push_back("flightmode/stabModeYaw");
+        updateParamsService.call(updateParams);
+
         ros::Timer timer = node.createTimer(ros::Duration(1.0/frequency), &Controller::iteration, this);
         ros::spin();
     }
@@ -180,6 +194,7 @@ private:
                 m_trajectory.points.clear();
                 crazyflie_controller::QuadcopterTrajectoryPoint pt;
                 pt.position.z = 0.5;
+                pt.yaw = M_PI / 2;
                 m_trajectory.points.push_back(pt);
             }
             break;
@@ -257,9 +272,9 @@ private:
 
                 geometry_msgs::Twist msg;
                 msg.linear.x = eulerPitchDesired;
-                msg.linear.y = -eulerRollDesired;
+                msg.linear.y = eulerRollDesired;
                 msg.linear.z = thrustDesired;
-                msg.angular.z = m_pidYaw.update(current_euler_yaw, eulerYawDesired);
+                msg.angular.z = eulerYawDesired; //m_pidYaw.update(current_euler_yaw, eulerYawDesired);
                 m_pubNav.publish(msg);
 
 
