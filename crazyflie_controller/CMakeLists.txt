@@ -105,7 +105,9 @@ include_directories(${EIGEN3_INCLUDE_DIR})
 
 # Declare a cpp executable
 add_executable(crazyflie_controller
-  src/controller.cpp)
+  src/controller.cpp
+  src/position_controller_mellinger.c
+)
 
 # Add cmake target dependencies of the executable/library
 # as an example, message headers may need to be generated before nodes
