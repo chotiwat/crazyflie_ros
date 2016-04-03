@@ -51,7 +51,6 @@ public:
         , m_serviceTakeoff()
         , m_serviceLand()
         , m_actionServerExecuteTrajectory(nullptr)
-        , m_thrust(0)
         , m_kp(get(n, "PIDs/Body/kp"))
         , m_kd(get(n, "PIDs/Body/kd"))
         , m_ki(get(n, "PIDs/Body/ki"))
@@ -176,25 +175,13 @@ private:
             {
                 tf::StampedTransform transform;
                 m_listener.lookupTransform(m_worldFrame, m_frame, ros::Time(0), transform);
-                if (transform.getOrigin().z() > 0.05 || m_thrust > 50000)
-                {
-                    pidReset();
-                    m_state = Automatic;
-                    m_thrust = 0;
-                    m_trajectory.header.stamp = ros::Time::now();
-                    m_trajectory.points.clear();
-                    crazyflie_controller::QuadcopterTrajectoryPoint pt;
-                    pt.position.z = 0.5;
-                    m_trajectory.points.push_back(pt);
-                }
-                else
-                {
-                    m_thrust += 10000 * dt;
-                    geometry_msgs::Twist msg;
-                    msg.linear.z = m_thrust;
-                    m_pubNav.publish(msg);
-                }
-
+                pidReset();
+                m_state = Automatic;
+                m_trajectory.header.stamp = ros::Time::now();
+                m_trajectory.points.clear();
+                crazyflie_controller::QuadcopterTrajectoryPoint pt;
+                pt.position.z = 0.5;
+                m_trajectory.points.push_back(pt);
             }
             break;
         case Landing:
@@ -364,7 +351,6 @@ private:
     ros::ServiceServer m_serviceTakeoff;
     ros::ServiceServer m_serviceLand;
     actionlib::SimpleActionServer<crazyflie_controller::ExecuteTrajectoryAction>* m_actionServerExecuteTrajectory;
-    float m_thrust;
 
     double m_kp;
     double m_kd;
