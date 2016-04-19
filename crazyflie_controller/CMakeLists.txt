@@ -10,8 +10,8 @@ find_package(catkin REQUIRED COMPONENTS
   tf_conversions
 )
 
-# Enable C++14
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
+# Enable C++11
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
 ## System dependencies are found with CMake's conventions
 find_package(Eigen3 REQUIRED)

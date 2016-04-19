@@ -95,10 +95,12 @@ public:
         updateParamsService.waitForExistence();
         ROS_INFO("found update_params");
 
-        node.setParam("/crazyflie/flightmode/stabModeYaw", 1);
+        node.setParam("/crazyflie/flightmode/stabModeYaw", 0);
+        node.setParam("/crazyflie/ring/effect", 2);
 
         crazyflie_driver::UpdateParams updateParams;
         updateParams.request.params.push_back("flightmode/stabModeYaw");
+        updateParams.request.params.push_back("ring/effect");
         updateParamsService.call(updateParams);
 
         ros::Timer timer = node.createTimer(ros::Duration(1.0/frequency), &Controller::iteration, this);
@@ -194,7 +196,7 @@ private:
                 m_trajectory.points.clear();
                 crazyflie_controller::QuadcopterTrajectoryPoint pt;
                 pt.position.z = 0.5;
-                pt.yaw = M_PI / 2;
+                pt.yaw = 0;
                 m_trajectory.points.push_back(pt);
             }
             break;
@@ -274,7 +276,8 @@ private:
                 msg.linear.x = eulerPitchDesired;
                 msg.linear.y = eulerRollDesired;
                 msg.linear.z = thrustDesired;
-                msg.angular.z = eulerYawDesired; //m_pidYaw.update(current_euler_yaw, eulerYawDesired);
+                // msg.angular.z = eulerYawDesired;
+                msg.angular.z = m_pidYaw.update(current_euler_yaw, eulerYawDesired / 180.0 * M_PI);
                 m_pubNav.publish(msg);
 
 

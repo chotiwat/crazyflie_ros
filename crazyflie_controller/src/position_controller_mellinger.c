@@ -80,11 +80,14 @@ static vector3f oldPosition;
 static bool firstUpdate = true;
 
 static const float g = 9.81;
-static const float mass = 0.027;
+static const float mass = 0.030;
 
-static float kp = 0.187;
-static float kd = 0.107;
-static float massThrust = 150000;
+static float kp_xy = 0.3;
+static float kd_xy = 0.2;
+static float kp_z = 0.2;
+static float kd_z = 0.1;
+
+static float massThrust = 130500;
 
 void positionControllerMellingerUpdate(
   const pose_t* poseEstimate,       // current state
@@ -105,7 +108,7 @@ void positionControllerMellingerUpdate(
   vector3f z_axis_desired;
   vector3f x_axis_desired;
   vector3f y_axis_desired;
-  vector3f tmp;
+  vector3f x_c_des;
 
   // Current velocity
   if (!firstUpdate
@@ -126,9 +129,9 @@ void positionControllerMellingerUpdate(
   v_error.z = target->velocity_z - velocity.z;
 
   // Desired thrust (ignoring target accellerations)
-  target_thrust.x = kp * r_error.x + kd * v_error.x + mass * 0;
-  target_thrust.y = kp * r_error.y + kd * v_error.y + mass * 0;
-  target_thrust.z = kp * r_error.z + kd * v_error.z + mass * g;
+  target_thrust.x = kp_xy * r_error.x + kd_xy * v_error.x + mass * 0;
+  target_thrust.y = kp_xy * r_error.y + kd_xy * v_error.y + mass * 0;
+  target_thrust.z = kp_z * r_error.z + kd_z * v_error.z + mass * g;
 
   // Z-Axis
   z_axis.x = -sin(poseEstimate->attitude.pitch) * cos(poseEstimate->attitude.roll);
@@ -143,17 +146,21 @@ void positionControllerMellingerUpdate(
   normalize(&z_axis_desired);
 
   // x_axis_desired = z_axis_desired x [sin(yaw), cos(yaw), 0]^T
-  tmp.x = sin(target->yaw);
-  tmp.y = cos(target->yaw);
-  tmp.z = 0;
-  cross(&z_axis_desired, &tmp, &x_axis_desired);
+  x_c_des.x = cos(target->yaw);
+  x_c_des.y = sin(target->yaw);
+  x_c_des.z = 0;
+  cross(&z_axis_desired, &x_c_des, &y_axis_desired);
+  normalize(&y_axis_desired);
+
+  cross(&y_axis_desired, &z_axis_desired, &x_axis_desired);
+  // cross(&z_axis_desired, &tmp, &x_axis_desired);
 
   // y_axis_desired = z_axis_desired x x_axis_desired
-  cross(&z_axis_desired, &x_axis_desired, &y_axis_desired);
+  // cross(&z_axis_desired, &x_axis_desired, &y_axis_desired);
 
   // Output
-  *eulerRollDesired = -atan2(y_axis_desired.z, z_axis_desired.z) * 180.0 / M_PI;
-  *eulerPitchDesired = asin(x_axis_desired.z) * 180.0 / M_PI;
+  *eulerRollDesired = atan2(y_axis_desired.z, z_axis_desired.z) * 180.0 / M_PI;
+  *eulerPitchDesired = -asin(x_axis_desired.z) * 180.0 / M_PI;
   *eulerYawDesired = target->yaw * 180.0 / M_PI; // assuming we have direct control!
   *thrustDesired = current_thrust;
 
