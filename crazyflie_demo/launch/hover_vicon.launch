@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <launch>
-  <arg name="uri" default="radio://0/80/2M/E7E7E7E701" />
+  <arg name="uri" default="radio://0/80/2M/E7E7E7E702" />
   <arg name="frame" default="/vicon/calib/calib" />
   <arg name="joy_dev" default="/dev/input/js0" />
   <arg name="x" default="0" />
@@ -50,7 +50,7 @@
   <include file="$(find vicon_bridge)/launch/vicon.launch"/>
 
   <!-- run rviz -->
-  <param name="robot_description" command="$(find xacro)/xacro.py $(find crazyflie_description)/urdf/crazyflie.urdf.xacro" />
-  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find crazyflie_demo)/launch/crazyflie_pos.rviz" required="true" />
+<!--   <param name="robot_description" command="$(find xacro)/xacro.py $(find crazyflie_description)/urdf/crazyflie.urdf.xacro" />
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find crazyflie_demo)/launch/crazyflie_pos.rviz" required="true" /> -->
 
 </launch>

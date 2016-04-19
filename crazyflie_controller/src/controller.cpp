@@ -63,6 +63,7 @@ public:
         , m_roll(0)
         , m_pitch(0)
         , m_yaw(0)
+        , m_baseHeight(0)
     {
         ros::NodeHandle nh;
         m_pubNav = nh.advertise<geometry_msgs::Twist>("cmd_vel", 1);
@@ -195,23 +196,34 @@ private:
                 m_trajectory.header.stamp = ros::Time::now();
                 m_trajectory.points.clear();
                 crazyflie_controller::QuadcopterTrajectoryPoint pt;
-                pt.position.z = 0.5;
+                pt.position.x = transform.getOrigin().x();
+                pt.position.y = transform.getOrigin().y();
+                pt.position.z = transform.getOrigin().z() + 0.5;
                 pt.yaw = 0;
+                m_baseHeight = transform.getOrigin().z();
                 m_trajectory.points.push_back(pt);
             }
             break;
         case Landing:
             {
+            	tf::StampedTransform transformGround;
+                m_listener.lookupTransform(m_worldFrame, "/vicon/turtlebot_demo/turtlebot_demo", ros::Time(0), transformGround);
+
                 // m_goal.pose.position.z = 0.05;
                 m_trajectory.header.stamp = ros::Time::now();
                 m_trajectory.points.clear();
                 crazyflie_controller::QuadcopterTrajectoryPoint pt;
-                pt.position.z = 0.05;
+                pt.position.x = transformGround.getOrigin().x();
+                pt.position.y = transformGround.getOrigin().y();
+                pt.position.z = m_baseHeight + 0.03;
                 m_trajectory.points.push_back(pt);
 
                 tf::StampedTransform transform;
                 m_listener.lookupTransform(m_worldFrame, m_frame, ros::Time(0), transform);
-                if (transform.getOrigin().z() <= 0.05) {
+                if (transform.getOrigin().z() <= m_baseHeight + 0.03
+                	&& fabs(transform.getOrigin().x() - pt.position.x) <= 0.03
+                	&& fabs(transform.getOrigin().y() - pt.position.y) <= 0.03
+                	) {
                     m_state = Idle;
                     geometry_msgs::Twist msg;
                     m_pubNav.publish(msg);
@@ -220,6 +232,20 @@ private:
             // intentional fall-thru
         case Automatic:
             {
+            	tf::StampedTransform transformGround;
+                m_listener.lookupTransform(m_worldFrame, "/vicon/turtlebot_demo/turtlebot_demo", ros::Time(0), transformGround);
+
+                tfScalar tb_euler_roll, tb_euler_pitch, tb_euler_yaw;
+                tf::Matrix3x3(transformGround.getRotation()).getRPY(
+                    tb_euler_roll,
+                    tb_euler_pitch,
+                    tb_euler_yaw);
+
+                m_trajectory.points.back().position.x = transformGround.getOrigin().x();
+                m_trajectory.points.back().position.y = transformGround.getOrigin().y();
+
+                m_trajectory.points.back().yaw = tb_euler_yaw;
+
                 tf::StampedTransform tf_transform;
                 m_listener.lookupTransform(m_worldFrame, m_frame, ros::Time(0), tf_transform);
 
@@ -329,6 +355,8 @@ private:
     double m_roll;
     double m_pitch;
     double m_yaw;
+
+    double m_baseHeight;
 
     // ros::time m_startTime;
 };
