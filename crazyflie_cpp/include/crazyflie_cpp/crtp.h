@@ -363,6 +363,8 @@ struct crtpLogDataResponse
 
 // Port 11 (PosExtBringup)
 
+typedef uint16_t fp16_t;
+
 struct crtpPosExtBringup
 {
   crtpPosExtBringup()
@@ -371,18 +373,17 @@ struct crtpPosExtBringup
     }
 
     const crtp header;
-    float x;
-    float y;
-    float z;
-    float q0;
-    float q1;
-    float q2;
-    float q3;
+    struct {
+      uint8_t id;
+      fp16_t x; // m
+      fp16_t y; // m
+      fp16_t z; // m
+      uint16_t quat[4]; //Quaternion; TODO: find more compact way to store this
+                        // each component between -1 and 1
+    } pose[2];
 } __attribute__((packed));
 
 // Port 12 (PosExt)
-
-typedef uint16_t fp16_t;
 
 struct crtpPosExt
 {

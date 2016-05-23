@@ -316,8 +316,8 @@ public:
     ROS_INFO("Found all transforms!");
 
     // m_numCFs = 25;
-    // std::vector<CrazyflieBroadcaster::stateExternal> stateExternal(m_numCFs);
-    CrazyflieBroadcaster::stateExternalBringup stateExternalBringup;
+    std::vector<CrazyflieBroadcaster::stateExternalBringup> stateExternalBringup(m_numCFs);
+    // CrazyflieBroadcaster::stateExternalBringup stateExternalBringup;
 
     // for (size_t i = 0; i < m_numCFs; ++i) {
     //   stateExternal[i].x = i + 0.1;
@@ -345,20 +345,18 @@ public:
         //     current_euler_pitch,
         //     current_euler_yaw);
 
-        // stateExternal[i].id = m_cfs[i]->id();
+        stateExternalBringup[i].id = m_cfs[i]->id();
         // stateExternal[i].x = transform.getOrigin().x();
         // stateExternal[i].y = transform.getOrigin().y();
         // stateExternal[i].z = transform.getOrigin().z();
         // stateExternal[i].yaw = atan2(sin(current_euler_yaw), cos(current_euler_yaw));
-        stateExternalBringup.x = transform.getOrigin().x();
-        stateExternalBringup.y = transform.getOrigin().y();
-        stateExternalBringup.z = transform.getOrigin().z();
-        stateExternalBringup.q0 = transform.getRotation().x();
-        stateExternalBringup.q1 = transform.getRotation().y();
-        stateExternalBringup.q2 = transform.getRotation().z();
-        stateExternalBringup.q3 = transform.getRotation().w();
-
-
+        stateExternalBringup[i].x = transform.getOrigin().x();
+        stateExternalBringup[i].y = transform.getOrigin().y();
+        stateExternalBringup[i].z = transform.getOrigin().z();
+        stateExternalBringup[i].q0 = transform.getRotation().x();
+        stateExternalBringup[i].q1 = transform.getRotation().y();
+        stateExternalBringup[i].q2 = transform.getRotation().z();
+        stateExternalBringup[i].q3 = transform.getRotation().w();
       }
 
       // m_cfbc.sendPositionExternal(
