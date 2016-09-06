@@ -280,6 +280,7 @@ void Crazyflie::requestLogToc()
 
 void Crazyflie::requestParamToc()
 {
+  std::cout << "\n\nrequestParamToc()\n\n";
   // Find the number of parameters in TOC
   crtpParamTocGetInfoRequest infoRequest;
   startBatchRequest();
@@ -291,9 +292,10 @@ void Crazyflie::requestParamToc()
   // check if it is in the cache
   std::string fileName = "params" + std::to_string(crc) + ".json";
   std::ifstream infile(fileName);
+  std::cout << "filename " << fileName << std::endl;
 
   if (!infile.good()) {
-    std::cout << "Params: " << len << std::endl;
+    std::cout << "Issuing param batch request: " << len << std::endl;
 
     // Request detailed information and values
     startBatchRequest();
@@ -317,6 +319,9 @@ void Crazyflie::requestParamToc()
       entry.readonly = r->readonly;
       entry.group = std::string(&r->text[0]);
       entry.name = std::string(&r->text[entry.group.size() + 1]);
+
+      std::cout << "storing param TOC entry " << entry.group << "/" << entry.name
+        << " of type " << entry.type << ", readonly = " << entry.readonly << std::endl;
 
       ParamValue v;
       std::memcpy(&v, &val->valueFloat, 4);

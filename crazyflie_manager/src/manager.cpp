@@ -126,7 +126,7 @@ private:
     {
         crazyflie_driver::Land srv;
         srv.request.group = 0;
-        srv.request.height = 0.06;
+        srv.request.height = 0.02;
         srv.request.time_from_start = ros::Duration(3.5);
         m_serviceLand.call(srv);
     }

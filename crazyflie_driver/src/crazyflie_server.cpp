@@ -53,6 +53,7 @@
 #include <fstream>
 #include <future>
 #include <mutex>
+#include <random>
 #include <wordexp.h> // tilde expansion
 
 /*
@@ -245,6 +246,7 @@ public:
       U value;
       ros::param::get(ros_param, value);
       m_cf.addSetParam<T>(id, (T)value);
+      std::cout << "param: setting " << ros_param << " to " << (T)value << std::endl;
   }
 
   bool updateParams(
@@ -258,6 +260,7 @@ public:
       size_t pos = p.find("/");
       std::string group(p.begin(), p.begin() + pos);
       std::string name(p.begin() + pos + 1, p.end());
+      std::cout << "CF requested param " << group << "/" << name << std::endl;
 
       auto entry = m_cf.getParamTocEntry(group, name);
       if (entry)
@@ -284,10 +287,13 @@ public:
           case Crazyflie::ParamTypeFloat:
             updateParam<float, float>(entry->id, ros_param);
             break;
+          default:
+            std::cout << "unhandled param type " << entry->type << std::endl;
         }
       }
       else {
         ROS_ERROR("Could not find param %s/%s", group.c_str(), name.c_str());
+        std::cout << "Could not find param " << group.c_str() << "/" << name.c_str();
       }
     }
     m_cf.setRequestedParams();
@@ -414,6 +420,7 @@ public:
       for (auto iter = m_cf.paramsBegin(); iter != m_cf.paramsEnd(); ++iter) {
         auto entry = *iter;
         std::string paramName = "/" + m_tf_prefix + "/" + entry.group + "/" + entry.name;
+        std::cout << "param TOC found " << paramName << std::endl;
         switch (entry.type) {
           case Crazyflie::ParamTypeUint8:
             ros::param::set(paramName, m_cf.getParam<uint8_t>(entry.id));
@@ -542,7 +549,6 @@ private:
   std::ofstream m_logFile;
 };
 
-
 // handles a group of Crazyflies, which share a radio
 class CrazyflieGroup
 {
@@ -557,7 +563,8 @@ public:
     const std::string broadcastAddress,
     bool useViconTracker,
     const std::vector<crazyflie_driver::LogBlock>& logBlocks,
-    std::string interactiveObject
+    std::string interactiveObject,
+    double noiseStddev = 0
     )
     : m_cfs()
     , m_tracker(nullptr)
@@ -570,6 +577,8 @@ public:
     , m_useViconTracker(useViconTracker)
     , m_br()
     , m_interactiveObject(interactiveObject)
+    , m_rng(std::random_device()())
+    , m_noiseStddev(noiseStddev)
   {
     std::vector<libobjecttracker::Object> objects;
     readObjects(objects, channel, logBlocks);
@@ -657,11 +666,14 @@ public:
           Eigen::Quaternionf q(transform.rotation());
           const auto& translation = transform.translation();
 
+          // added noise defaults to 0, used for state estimation robustness experiments
+          std::normal_distribution<double> randn(0, m_noiseStddev);
+
           states.resize(states.size() + 1);
           states.back().id = m_cfs[i]->id();
-          states.back().x = translation.x();
-          states.back().y = translation.y();
-          states.back().z = translation.z();
+          states.back().x = translation.x() + randn(m_rng);
+          states.back().y = translation.y() + randn(m_rng);
+          states.back().z = translation.z() + randn(m_rng);
           states.back().q0 = q.x();
           states.back().q1 = q.y();
           states.back().q2 = q.z();
@@ -692,11 +704,11 @@ public:
       // ROS_INFO("Broadcasting: %f s", elapsedSeconds.count());
     }
 
-    auto time = std::chrono::duration_cast<std::chrono::microseconds>(
-      std::chrono::high_resolution_clock::now().time_since_epoch()).count();
-    for (const auto& state : states) {
-      std::cout << time << "," << state.x << "," << state.y << "," << state.z << std::endl;
-    }
+    // auto time = std::chrono::duration_cast<std::chrono::microseconds>(
+    //   std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+    // for (const auto& state : states) {
+    //   std::cout << time << "," << state.x << "," << state.y << "," << state.z << std::endl;
+    // }
 
   }
 
@@ -792,11 +804,14 @@ private:
         && !translation.Occluded
         && !quaternion.Occluded) {
 
+      // added noise defaults to 0, used for state estimation robustness experiments
+      std::normal_distribution<double> randn(0, m_noiseStddev);
+
       states.resize(states.size() + 1);
       states.back().id = id;
-      states.back().x = translation.Translation[0] / 1000.0;
-      states.back().y = translation.Translation[1] / 1000.0;
-      states.back().z = translation.Translation[2] / 1000.0;
+      states.back().x = translation.Translation[0] / 1000.0 + randn(m_rng);
+      states.back().y = translation.Translation[1] / 1000.0 + randn(m_rng);
+      states.back().z = translation.Translation[2] / 1000.0 + randn(m_rng);
       states.back().q0 = quaternion.Rotation[0];
       states.back().q1 = quaternion.Rotation[1];
       states.back().q2 = quaternion.Rotation[2];
@@ -949,6 +964,8 @@ private:
     for (; iter != firmwareParams.end(); ++iter) {
       std::string group = iter->first;
       XmlRpc::XmlRpcValue v = iter->second;
+      ROS_ASSERT(v.getType() == XmlRpc::XmlRpcValue::TypeArray);
+      std::cout << "found group " << group << " of size " << v.size() << std::endl;
       auto iter2 = v.begin();
       for (; iter2 != v.end(); ++iter2) {
         std::string param = iter2->first;
@@ -965,6 +982,7 @@ private:
         } else {
           ROS_WARN("No known type for %s.%s!", group.c_str(), param.c_str());
         }
+        std::cout << "request param " << group << "/" << param << std::endl;
         request.params.push_back(group + "/" + param);
       }
     }
@@ -983,6 +1001,8 @@ private:
   bool m_isEmergency;
   bool m_useViconTracker;
   tf::TransformBroadcaster m_br;
+  std::mt19937 m_rng;
+  double m_noiseStddev;
 };
 
 // handles all Crazyflies
@@ -1060,6 +1080,8 @@ public:
     bool useViconTracker;
     std::string logFilePath;
     std::string interactiveObject;
+    float viconLatencyWarningThreshold;
+    double noiseStddev;
 
     ros::NodeHandle nl("~");
     nl.getParam("host_name", hostName);
@@ -1067,6 +1089,8 @@ public:
     nl.getParam("broadcast_address", broadcastAddress);
     nl.param<std::string>("save_point_clouds", logFilePath, "");
     nl.param<std::string>("interactive_object", interactiveObject, "");
+    nl.param<double>("noise_stddev", noiseStddev, 0.0);
+    nl.getParam("vicon_latency_warning_threshold", viconLatencyWarningThreshold);
 
     // tilde-expansion
     wordexp_t wordexp_result;
@@ -1130,7 +1154,8 @@ public:
                 broadcastAddress,
                 useViconTracker,
                 logBlocks,
-                interactiveObject);
+                interactiveObject,
+                noiseStddev);
             },
             channel,
             r
@@ -1203,7 +1228,7 @@ public:
 
       // Get the latency
       float viconLatency = client.GetLatencyTotal().Total;
-      if (viconLatency > 0.035) {
+      if (viconLatency > viconLatencyWarningThreshold) {
         std::stringstream sstr;
         sstr << "VICON Latency high: " << viconLatency << " s." << std::endl;
         size_t latencyCount = client.GetLatencySampleCount().Count;
