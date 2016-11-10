@@ -9,9 +9,8 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   tf
   crazyflie_cpp
-  libobjecttracker
-  libmotioncapture
   tf_conversions
+  tf2_ros
 )
 
 # Enable C++11
