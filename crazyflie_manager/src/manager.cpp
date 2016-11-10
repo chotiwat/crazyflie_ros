@@ -14,10 +14,11 @@
 #include <crazyflie_driver/StartEllipse.h>
 #include <crazyflie_driver/GoHome.h>
 
-
+#define PS3
 
 namespace Xbox360Buttons {
 
+#ifndef PS3
     enum {
         Green  = 0,
         Red    = 1,
@@ -29,6 +30,19 @@ namespace Xbox360Buttons {
         Start  = 7,
         COUNT  = 8,
     };
+#else
+    enum {
+        Green  = 14, // X
+        Red    = 13, // Circle
+        Blue   = 15, // Square
+        Yellow = 12, // Triangle
+        LB     = 8,
+        RB     = 9,
+        Back   = 0,
+        Start  = 3,
+        COUNT  = 8,
+    };
+#endif
 
 }
 
@@ -117,7 +131,7 @@ private:
     {
         crazyflie_driver::Takeoff srv;
         srv.request.group = 0;
-        srv.request.height = 1.0;
+        srv.request.height = 0.5;
         srv.request.time_from_start = ros::Duration(2.0);
         m_serviceTakeoff.call(srv);
     }
