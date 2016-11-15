@@ -17,7 +17,7 @@ find_package(catkin REQUIRED COMPONENTS
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 #SET(CMAKE_CXX_COMPILER             "gcc-4.9")
 
-set(VICON_SDK_DIR ../externalDependencies/libmotioncapture/externalDependencies/vicon_sdk/)
+# set(VICON_SDK_DIR ../externalDependencies/libmotioncapture/externalDependencies/vicon_sdk/)
 
 # SET(CMAKE_BUILD_TYPE "Debug")
 
@@ -104,9 +104,9 @@ include_directories(
   ../../../../crazyflie-firmware/src/modules/interface/
 )
 
-link_directories(
-  ${VICON_SDK_DIR}/lib64
-)
+# link_directories(
+#  ${VICON_SDK_DIR}/lib64
+# )
 
 # message(${CMAKE_BINARY_DIR}/crazyflie_ros/externalDependencies/libobjecttracker)
 
