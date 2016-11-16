@@ -191,7 +191,7 @@ public:
     // Static transform broadcaster for tag flipping
     geometry_msgs::TransformStamped staticTransformStamped;
     staticTransformStamped.header.stamp = ros::Time::now();
-    staticTransformStamped.header.frame_id = "tag_id_" + std::to_string(m_tagId);
+    staticTransformStamped.header.frame_id = "ar_marker_" + std::to_string(m_tagId);
     staticTransformStamped.child_frame_id = m_frame;
     auto &translation = staticTransformStamped.transform.translation;
     auto &rotation = staticTransformStamped.transform.rotation;
