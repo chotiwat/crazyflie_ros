@@ -13,6 +13,7 @@
 #include <cstring>
 #include <stdexcept>
 #include <thread>
+#include <cinttypes>
 
 #include "num.h"
 
@@ -56,7 +57,7 @@ Crazyflie::Crazyflie(
   char datarateType;
   bool success = false;
 
-  success = std::sscanf(link_uri.c_str(), "radio://%d/%d/%d%c/%lx",
+  success = std::sscanf(link_uri.c_str(), "radio://%d/%d/%d%c/%" SCNx64,
      &m_devId, &channel, &datarate,
      &datarateType, &m_address) == 5;
   if (!success) {
@@ -946,7 +947,7 @@ CrazyflieBroadcaster::CrazyflieBroadcaster(
   char datarateType;
   bool success = false;
 
-  success = std::sscanf(link_uri.c_str(), "radio://%d/%d/%d%c/%lx",
+  success = std::sscanf(link_uri.c_str(), "radio://%d/%d/%d%c/%" SCNx64,
      &m_devId, &channel, &datarate,
      &datarateType, &m_address) == 5;
   if (!success) {
