@@ -707,7 +707,7 @@ public:
           // already sent
           continue;
         } else if (ros::Time::now() - transform.stamp_ > ros::Duration(0.1)) {
-          ROS_DEBUG("Transform data for CF %s -> %s too old. Latest transform was at %f",
+          ROS_DEBUG_THROTTLE(0.5, "Transform data for CF %s -> %s too old. Latest transform was at %f",
             m_cfs[i]->worldFrame().c_str(),
             m_cfs[i]->frame().c_str(),
             transform.stamp_.toSec());
@@ -715,7 +715,7 @@ public:
         }
         m_cfs[i]->lastDetected = transform.stamp_;
       } catch (const std::exception& e) {
-        ROS_WARN("Transform lookup error for CF %s -> %s: %s.",
+        ROS_DEBUG_THROTTLE(0.5, "Transform lookup error for CF %s -> %s: %s.",
           m_cfs[i]->worldFrame().c_str(),
           m_cfs[i]->frame().c_str(),
           e.what());
