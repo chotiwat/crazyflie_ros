@@ -610,6 +610,7 @@ public:
     int radio,
     int channel,
     const std::string broadcastAddress,
+    const std::string worldFrame,
     const std::vector<crazyflie_driver::LogBlock>& logBlocks,
     std::string interactiveObject,
     bool writeCSVs
@@ -619,6 +620,7 @@ public:
     , m_radio(radio)
     , m_slowQueue()
     , m_cfbc("radio://" + std::to_string(radio) + "/" + std::to_string(channel) + "/2M/" + broadcastAddress)
+    , m_worldFrame(worldFrame)
     , m_isEmergency(false)
     // , m_br()
     , m_interactiveObject(interactiveObject)
@@ -939,7 +941,7 @@ private:
 
     // add Crazyflies
     for (const auto& config : cfConfigs) {
-      addCrazyflie(config.uri, config.tf_prefix, config.frame, "/world", enableParameters, enableLogging, config.idNumber, config.tagId, logBlocks, forceNoCache);
+      addCrazyflie(config.uri, config.tf_prefix, config.frame, m_worldFrame, enableParameters, enableLogging, config.idNumber, config.tagId, logBlocks, forceNoCache);
 
       auto start = std::chrono::high_resolution_clock::now();
       updateParams(m_cfs.back());
@@ -1041,6 +1043,7 @@ private:
   int m_phase;
   std::chrono::high_resolution_clock::time_point m_phaseStart;
   tf::TransformListener m_listener;
+  std::string m_worldFrame;
 };
 
 // handles all Crazyflies
@@ -1132,6 +1135,7 @@ public:
     nl.param<std::string>("interactive_object", interactiveObject, "");
     nl.getParam("print_latency", printLatency);
     nl.getParam("write_csvs", writeCSVs);
+    nl.param<std::string>("world_frame", m_worldFrame, "/world");
 
     // tilde-expansion
     // wordexp_t wordexp_result;
@@ -1187,6 +1191,7 @@ public:
                 radio,
                 channel,
                 broadcastAddress,
+                m_worldFrame,
                 // useViconTracker,
                 logBlocks,
                 interactiveObject,
